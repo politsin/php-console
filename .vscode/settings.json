@@ -1,0 +1,5 @@
+{
+  "phpsab.executablePathCBF": "/var/lib/composer/vendor/bin/phpcbf",
+  "phpsab.executablePathCS": "/var/lib/composer/vendor/bin/phpcs",
+  "phpcs.executablePath": "/var/lib/composer/vendor/bin/phpcs"
+}
