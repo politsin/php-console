@@ -47,20 +47,25 @@ class MixerCommand extends Command {
    */
   protected function execute(InputInterface $input, OutputInterface $output) {
     $io = new SymfonyStyle($input, $output);
-    $io->section('Hello');
+    // $io->section('Hello');
     $this->io = $io;
     $this->initSerial();
     $commands = [
       "G91",
-      "G0 X10",
-      "G0 Y20",
-      "G0 Z30",
-      "G0 E40",
-      "G0 X10 Y10 Z10 E10",
-      "G0 Y20",
-      "G0 Z30",
+      "G4 P100",
+      "G0 X-350 F3000",
+      "G4 S1",
+      "G0 Y-540 F3000",
+      "G4 S1",
+      "G0 Z-370 F3000",
+      "G4 S1",
+      "G0 E-200 F3000",
+      "G4 S1",
+      // "G0 X-350 Y-540 Z-370 E-200 F6000",
+      "G4 S1",
       "M18",
     ];
+    $io->text("Commands:");
     foreach ($commands as $cmd) {
       $this->stepAndOk($cmd);
     }
@@ -74,14 +79,17 @@ class MixerCommand extends Command {
     $this->io->text($command);
     $this->serial->send("$command\r\n");
     $ok = "";
-    while ($ok != "ok") {
-      $responce = $this->serial->read();
-      foreach (explode("\n", $responce) as $line) {
-        $data = trim($line);
-        if ($data) {
-          $this->io->text($data);
-          if ($data == "ok") {
-            $ok = "ok";
+    if (TRUE) {
+      while ($ok != "ok") {
+        usleep(100);
+        $responce = $this->serial->read();
+        foreach (explode("\n", $responce) as $line) {
+          $data = trim($line);
+          if ($data) {
+            $this->io->text($data);
+            if ($data == "ok") {
+              $ok = "ok";
+            }
           }
         }
       }
@@ -101,11 +109,13 @@ class MixerCommand extends Command {
     $ok = "";
     while ($ok != "ok") {
       $serial->send("M118 hello\r\n");
-      usleep(10 * 1000);
+      usleep(100);
       $responce = $serial->read();
       foreach (explode("\n", $responce) as $line) {
         $data = trim($line);
-        $this->io->text($data);
+        if ($data) {
+          $this->io->text($data);
+        }
         if ($data == "ok") {
           $ok = "ok";
         }
