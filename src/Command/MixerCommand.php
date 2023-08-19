@@ -49,6 +49,15 @@ class MixerCommand extends Command {
     $io = new SymfonyStyle($input, $output);
     // $io->section('Hello');
     $this->io = $io;
+    $this->runTty($io);
+
+    return 0;
+  }
+
+  /**
+   * Command and wait ok.
+   */
+  protected function runTty($io) {
     $this->initSerial();
     $commands = [
       "G91",
@@ -69,7 +78,6 @@ class MixerCommand extends Command {
     foreach ($commands as $cmd) {
       $this->stepAndOk($cmd);
     }
-    return 0;
   }
 
   /**
