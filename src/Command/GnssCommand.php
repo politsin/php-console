@@ -75,6 +75,30 @@ class GnssCommand extends Command {
   /**
    * Serial init.
    */
+  protected function gotMessage(string $msg) {
+    // $this->io->text($msg);
+    $data = explode(",", $msg);
+    $type = trim($data[0]);
+    $coord = [];
+    if ($type == '$GPGLL') {
+      $lat = floatval(trim($data[1])) / 100;
+      $lon = floatval(trim($data[3])) / 100;
+      $alt = floatval(trim($data[5])) / 1000;
+      $coord = [
+        'lat' => number_format($lat, 9),
+        'lon' => number_format($lon, 9),
+        'alt' => number_format($alt, 3),
+      ];
+      $this->io->text(json_encode($coord));
+    }
+    else {
+      // $this->io->text($type);
+    }
+  }
+
+  /**
+   * Serial init.
+   */
   protected function runSerial() {
     $serial = $this->serial;
     $ok = "";
@@ -84,7 +108,7 @@ class GnssCommand extends Command {
       foreach (explode("\n", $responce) as $line) {
         $data = trim($line);
         if ($data) {
-          $this->io->text($data);
+          $this->gotMessage($data);
         }
       }
     }
