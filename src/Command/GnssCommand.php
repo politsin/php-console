@@ -22,6 +22,7 @@ class GnssCommand extends Command {
   private SerialDio $serial;
   private SymfonyStyle $io;
   private string $port = '/dev/ttyACM0';
+  private int $count = 0;
   // phpcs:enable
 
   /**
@@ -79,21 +80,63 @@ class GnssCommand extends Command {
     // $this->io->text($msg);
     $data = explode(",", $msg);
     $type = trim($data[0]);
+    switch ($type) {
+      case '$GPGLL':
+        $this->parseGll($data);
+        break;
+
+      default:
+        $this->io->text($msg);
+        break;
+    }
+  }
+
+  /**
+   * Parse GLL.
+   */
+  protected function parseGll(array $data) : void {
     $coord = [];
-    if ($type == '$GPGLL') {
-      $lat = floatval(trim($data[1])) / 100;
-      $lon = floatval(trim($data[3])) / 100;
-      $alt = floatval(trim($data[5])) / 1000;
-      $coord = [
-        'lat' => number_format($lat, 9),
-        'lon' => number_format($lon, 9),
-        'alt' => number_format($alt, 3),
-      ];
-      $this->io->text(json_encode($coord));
-    }
-    else {
-      // $this->io->text($type);
-    }
+    $i = $this->count++;
+    $lat = floatval(trim($data[1])) / 100;
+    $lon = floatval(trim($data[3])) / 100;
+    $alt = floatval(trim($data[5])) / 1000;
+    $coord = [
+      'lat' => number_format($lat, 9, '.'),
+      'lon' => number_format($lon, 9, '.'),
+      'alt' => number_format($alt, 3, '.'),
+    ];
+    // $this->io->text(json_encode($coord));
+    $this->io->text("$i\t[{$coord['lat']},{$coord['lon']}]\t{$coord['alt']}");
+  }
+
+  /**
+   * Parse RMC | Recommended Minimum data.
+   */
+  protected function parseRmc(array $data) : void {
+  }
+
+  /**
+   * Parse VTG | Course over ground and Ground speed.
+   */
+  protected function parseVtg(array $data) : void {
+  }
+
+  /**
+   * Parse GGA | Global positioning system fix data.
+   */
+  protected function parseGga(array $data) : void {
+  }
+
+  /**
+   * Parse GSA | GNSS DOP and Active Satellites.
+   */
+  protected function parseGsa(array $data) : void {
+  }
+
+  /**
+   * Parse GSV | GNSS Satellites in View.
+   */
+  protected function parseGsv(array $data) : void {
   }
 
   /**
