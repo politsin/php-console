@@ -7,11 +7,12 @@ if (!is_dir(__DIR__ . "/vendor")) {
 
 require __DIR__ . '/vendor/autoload.php';
 
+use App\Command\TestCommand;
 use App\Command\GnssCommand;
 use App\Command\MixerCommand;
+use App\Command\ModBusCommand;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Dotenv\Dotenv;
-use App\Command\ModBusCommand;
 
 // Sup .env vars.
 $dotenv = new Dotenv();
@@ -22,6 +23,7 @@ $app = new Application('Console App', 'v0.1.0');
 $app->add(new ModBusCommand());
 $app->add(new MixerCommand());
 $app->add(new GnssCommand());
+$app->add(new TestCommand());
 if (!empty($_ENV['APP_TEMPLATE'])) {
   $app->setDefaultCommand($_ENV['APP_TEMPLATE'], TRUE);
 }
