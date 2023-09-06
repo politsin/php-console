@@ -77,7 +77,6 @@ class GnssCommand extends Command {
    * Serial init.
    */
   protected function gotMessage(string $msg) {
-    // $this->io->text($msg);
     $data = explode(",", $msg);
     $type = trim($data[0]);
     switch ($type) {
