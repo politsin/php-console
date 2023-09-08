@@ -8,6 +8,7 @@ apt install php \
             php-dev \
             php-zip \
             php-pear \
+            php8.1-gmp  
 
 pecl install dio
 # OR 

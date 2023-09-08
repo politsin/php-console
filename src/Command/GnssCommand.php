@@ -78,16 +78,44 @@ class GnssCommand extends Command {
    */
   protected function gotMessage(string $msg) {
     $data = explode(",", $msg);
-    $type = trim($data[0]);
-    switch ($type) {
-      case '$GPGLL':
-        $this->parseGll($data);
-        break;
+    if (count($data) > 2) {
+      $type = trim(array_shift($data));
+      array_pop($data);
+      switch (substr($type, 3)) {
+        case 'GLL':
+          // $this->parseGll($data);
+          break;
 
-      default:
-        $this->io->text($msg);
-        break;
+        default:
+          // $this->io->text("$type " . implode(",", $data));
+          break;
+      }
     }
+    else {
+      // $this->io->text("$type " . implode(",", $data));
+    }
+  }
+
+  /**
+   * CRC exclusive OR of all characters between '$' and '*'.
+   */
+  protected function crcCheck(string $line) : bool {
+    $result = FALSE;
+    $checksum = substr($line, strpos($line, '*') + 1);
+    $start = strpos($line, '$') + 1;
+    $finish = strpos($line, '*') - 1;
+    $line = substr($line, $start, $finish);
+    $r = 0;
+    foreach (str_split($line) as $char) {
+      $r = $r ^ ord($char);
+    }
+    $ch = strtoupper(gmp_strval($r, 16));
+    $check = str_pad($ch, 2, "0", STR_PAD_LEFT);
+    $this->io->text("$check | $checksum | >$line<");
+    if ($check == $checksum) {
+      $result = TRUE;
+    }
+    return $result;
   }
 
   /**
@@ -96,15 +124,14 @@ class GnssCommand extends Command {
   protected function parseGll(array $data) : void {
     $coord = [];
     $i = $this->count++;
-    $lat = floatval(trim($data[1])) / 100;
-    $lon = floatval(trim($data[3])) / 100;
-    $alt = floatval(trim($data[5])) / 1000;
+    $lat = floatval(trim($data[0])) / 100;
+    $lon = floatval(trim($data[2])) / 100;
+    $alt = floatval(trim($data[4])) / 1000;
     $coord = [
       'lat' => number_format($lat, 9, '.'),
       'lon' => number_format($lon, 9, '.'),
       'alt' => number_format($alt, 3, '.'),
     ];
-    // $this->io->text(json_encode($coord));
     $this->io->text("$i\t[{$coord['lat']},{$coord['lon']}]\t{$coord['alt']}");
   }
 
@@ -149,7 +176,7 @@ class GnssCommand extends Command {
       $responce = $serial->read();
       foreach (explode("\n", $responce) as $line) {
         $data = trim($line);
-        if ($data) {
+        if ($data && $this->crcCheck($line)) {
           $this->gotMessage($data);
         }
       }
