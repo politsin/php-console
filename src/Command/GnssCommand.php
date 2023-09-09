@@ -23,6 +23,7 @@ class GnssCommand extends Command {
   private SymfonyStyle $io;
   private string $port = '/dev/ttyACM0';
   private int $count = 0;
+  private array $gsv = [];
   // phpcs:enable
 
   /**
@@ -77,18 +78,24 @@ class GnssCommand extends Command {
    * Serial init.
    */
   protected function gotMessage(string $msg) {
-    $data = explode(",", $msg);
+    $data = explode(",", strstr($msg, '*', TRUE));
     if (count($data) > 2) {
       $type = trim(array_shift($data));
-      array_pop($data);
+      // array_pop($data);
       switch (substr($type, 3)) {
         case 'RMC':
           // Recommended Minimum data.
-          $this->parseRmc($data);
+          // $this->parseRmc($data);
           break;
 
         case 'GLL':
+          // Lat and long, with time of position fix and status.
           // $this->parseGll($data);
+          break;
+
+        case 'GSV':
+          // Satellites in View.
+          $this->parseGsv($data);
           break;
 
         default:
@@ -190,6 +197,35 @@ class GnssCommand extends Command {
    * Parse GSV | GNSS Satellites in View.
    */
   protected function parseGsv(array $data) : void {
+    $this->io->text(json_encode($data));
+    $keys = ['id', 'Elevation 0-90', 'Azimuth 0-359', 'Signal 0-99'];
+    $msgSize = array_shift($data);
+    $msgNum = array_shift($data);
+    $numSv = array_shift($data);
+    if ($msgNum == 1) {
+      $this->gsv = [
+        'numSv' => $numSv,
+        'data' => [],
+      ];
+    }
+    $this->gsv['data'][$msgNum] = $data;
+    if ($msgSize == $msgNum && count($this->gsv['data']) == $msgSize) {
+      $result = [];
+      foreach ($this->gsv['data'] as $value) {
+        $result = [...$result, ...$value];
+      }
+      if (count($result) % 4 == 0) {
+        $satelits = array_chunk($result, 4);
+        $this->io->text("Number of satellites in view: $numSv");
+        $this->io->text(json_encode($keys));
+        foreach ($satelits as $satelit) {
+          $this->io->text(json_encode($satelit));
+        }
+      }
+      else {
+        $this->io->error("Data size mismatch");
+      }
+    }
   }
 
   /**
