@@ -56,9 +56,9 @@ class GnssCommand extends Command {
   /**
    * Serial init.
    */
-  protected function resetSerial() {
-    // GNSS: shell_exec('usbreset 1546:01a7').
-    shell_exec('usbreset 1a86:7523');
+  protected function resetSerial() : void {
+    // shell_exec('usbreset 1546:01a7');
+    // shell_exec('usbreset 1a86:7523');.
   }
 
   /**
@@ -82,6 +82,11 @@ class GnssCommand extends Command {
       $type = trim(array_shift($data));
       array_pop($data);
       switch (substr($type, 3)) {
+        case 'RMC':
+          // Recommended Minimum data.
+          $this->parseRmc($data);
+          break;
+
         case 'GLL':
           // $this->parseGll($data);
           break;
@@ -92,7 +97,7 @@ class GnssCommand extends Command {
       }
     }
     else {
-      // $this->io->text("$type " . implode(",", $data));
+      $this->io->warning("SMALL DATA: " . implode(",", $data));
     }
   }
 
@@ -111,11 +116,20 @@ class GnssCommand extends Command {
     }
     $ch = strtoupper(gmp_strval($r, 16));
     $check = str_pad($ch, 2, "0", STR_PAD_LEFT);
-    $this->io->text("$check | $checksum | >$line<");
     if ($check == $checksum) {
       $result = TRUE;
     }
+    else {
+      $this->io->error("$check | $checksum | >$line<");
+    }
     return $result;
+  }
+
+  /**
+   * Parse GLL.
+   */
+  protected function parseDtm(array $data) : void {
+    $this->io->text(json_encode($data));
   }
 
   /**
@@ -133,12 +147,25 @@ class GnssCommand extends Command {
       'alt' => number_format($alt, 3, '.'),
     ];
     $this->io->text("$i\t[{$coord['lat']},{$coord['lon']}]\t{$coord['alt']}");
+    $this->io->text(json_encode($data));
   }
 
   /**
    * Parse RMC | Recommended Minimum data.
    */
-  protected function parseRmc(array $data) : void {
+  protected function parseRmc(array $data) : array {
+    $result = [
+      'status' => ($data[1] == 'A') ? 'Valid' : 'Warning',
+      'lat' => $data[2],
+      'long' => $data[4],
+      'NS-EW' => "{$data[3]}{$data[5]}",
+      'speed' => $data[6],
+      'course' => $data[7],
+      'date' => $data[8],
+      'time' => $data[0],
+    ];
+    $this->io->text(json_encode($result));
+    return $result;
   }
 
   /**
