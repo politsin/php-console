@@ -23,6 +23,10 @@ wget https://getcomposer.org/installer -q -O composer-setup.php && \
     php composer-setup.php --install-dir=/usr/local/bin --filename=composer && \
     chmod +x /usr/local/bin/composer
 
+php --version
+export COMPOSER_ALLOW_SUPERUSER=1
+composer --version
+
 #PHPCS:::
 mkdir -p /var/lib/composer && \
       cd /var/lib/composer && \
