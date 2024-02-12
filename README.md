@@ -24,7 +24,7 @@ wget https://getcomposer.org/installer -q -O composer-setup.php && \
     chmod +x /usr/local/bin/composer
 
 #PHPCS:::
-mkdir /var/lib/composer && \
+mkdir -p /var/lib/composer && \
       cd /var/lib/composer && \
       wget https://raw.githubusercontent.com/politsin/snipets/master/patch/composer.json && \
       composer install -o && \
