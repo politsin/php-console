@@ -2,7 +2,9 @@
 <?php
 
 if (!is_dir(__DIR__ . "/vendor")) {
-  shell_exec("composer install --no-dev  -o -d " . __DIR__);
+  shell_exec("export COMPOSER_ALLOW_SUPERUSER=1");
+  shell_exec("composer install -od " . __DIR__);
+  // shell_exec("composer install --no-dev  -o -d " . __DIR__);
 }
 
 require __DIR__ . '/vendor/autoload.php';
