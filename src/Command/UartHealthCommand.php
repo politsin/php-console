@@ -29,6 +29,8 @@ class UartHealthCommand extends Command {
     $number = 1;
     $io = new SymfonyStyle($input, $output);
     $io->section('Uart');
+    $tty = shell_exec('ls /dev/ttyUSB*');
+    dump($tty);
     $table = new Table($output);
     $table
       ->setHeaderTitle('Books')
@@ -41,8 +43,7 @@ class UartHealthCommand extends Command {
         new TableSeparator(),
         ['80-902734-1-6', 'And Then There Were None', 'Agatha Christie'],
       ]);
-    $table->render();
-
+    // $table->render();
     return 0;
   }
 
