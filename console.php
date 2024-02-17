@@ -1,18 +1,17 @@
-#!/usr/bin/env php
 <?php
 
-if (!is_dir(__DIR__ . "/vendor")) {
-  shell_exec("export COMPOSER_ALLOW_SUPERUSER=1");
-  shell_exec("composer install -od " . __DIR__);
-  // shell_exec("composer install --no-dev  -o -d " . __DIR__);
-}
+/**
+ * @file
+ * 
+ * Console RUN.
+ */
 
 require __DIR__ . '/vendor/autoload.php';
 
-use App\Command\TestCommand;
 use App\Command\GnssCommand;
 use App\Command\MixerCommand;
 use App\Command\ModBusCommand;
+use App\Command\TestCommand;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Dotenv\Dotenv;
 
