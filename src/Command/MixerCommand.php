@@ -2,16 +2,16 @@
 
 namespace App\Command;
 
-use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Console\Style\SymfonyStyle;
 use Fawno\PhpSerial\Config\BaudRates;
 use Fawno\PhpSerial\Config\DataBits;
 use Fawno\PhpSerial\Config\Parity;
 use Fawno\PhpSerial\Config\StopBits;
 use Fawno\PhpSerial\SerialConfig;
 use Fawno\PhpSerial\SerialDio;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
  * Marlin G-code Mixer.
