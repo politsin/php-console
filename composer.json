@@ -4,7 +4,8 @@
         "symfony/process": "^6.0",
         "symfony/dotenv": "^6.0",
         "fawno/modbus": "^0.2.1",
-        "symfony/var-dumper": "^6.4"
+        "symfony/var-dumper": "^6.4",
+        "symfony/yaml": "^6.4"
     },
     "autoload": {
         "psr-4": {

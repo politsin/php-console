@@ -2,52 +2,102 @@
 
 namespace App\Command;
 
+use App\Util\ExecTrait;
+use App\Util\UartTrait;
+use Fawno\PhpSerial\SerialDio;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Helper\Table;
-use Symfony\Component\Console\Helper\TableSeparator;
-use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Component\Yaml\Yaml;
 
 /**
- * Update.
+ * Scale Command.
  */
 class ScaleCommand extends Command {
 
+  use UartTrait;
+  use ExecTrait;
+  // phpcs:disable
+  private SerialDio $serial;
+  private SymfonyStyle $io;
+  private string $port = '/dev/ttyUSB0';
   /**
    * Config.
    */
   protected function configure() {
-    $this
-      ->setName('scale')
-      ->setDescription('Demo')
-      ->addArgument('text', InputArgument::OPTIONAL, 'Input text')
-      ->addOption('commit');
+    $this->setName('scale')->setDescription('Demo');
   }
 
   /**
    * Exec.
    */
   protected function execute(InputInterface $input, OutputInterface $output) {
-    $number = 1;
     $io = new SymfonyStyle($input, $output);
-    $io->section('Table');
-    $table = new Table($output);
-    $table
-      ->setHeaderTitle('Books')
-      ->setHeaders(['ISBN', 'Title', 'Author'])
-      ->setColumnWidths([10, 0, 30])
-      ->setRows([
-        ['99921-58-10-7', 'Divine Comedy', 'Dante Alighieri'],
-        ['9971-5-0210-0', 'A Tale of Two Cities', 'Charles Dickens'],
-        ['960-425-059-0', 'The Lord of the Rings', 'J. R. R. Tolkien'],
-        new TableSeparator(),
-        ['80-902734-1-6', 'And Then There Were None', 'Agatha Christie'],
-      ]);
-    $table->render();
-
+    $this->io = $io;
+    $scale = $this->initScale();
+    usleep(100 * 1000);
+    $this->readData($scale);
+    $this->loop($scale);
     return 0;
+  }
+
+  /**
+   * Loop.
+   */
+  private function initScale() : SerialDio {
+    $this->resetSerial('214b:7250');
+    return $this->initSerial('/dev/ttyUSB1');
+  }
+
+  /**
+   * Loop.
+   */
+  private function loop(SerialDio $serial, $delay_ms = 100) {
+    $this->io->writeln("Loop start");
+    $ok = "";
+    while ($ok != "ok") {
+      $data = $this->readData($serial);
+      usleep($delay_ms * 1000);
+    }
+  }
+
+  /**
+   * Loop.
+   */
+  private function readData(SerialDio $serial) : array {
+    $result = [];
+    foreach (explode("\n", $serial->read()) as $line) {
+      $line = substr(trim($line), 3, -3);
+      if ($line) {
+        $yaml = str_replace(":", ": ", implode("\n", explode(" ", $line)));
+        try {
+          $data = Yaml::parse($yaml);
+          if (NULL !== $scale = $this->parseScale($data)) {
+            $this->io->writeln("Scale: $scale");
+          }
+          $result[] = $data;
+        }
+        catch (\Throwable $th) {
+          $this->io->writeln($th->getMessage());
+        }
+      }
+    }
+    return $result;
+  }
+
+  /**
+   * Parse scale val.
+   */
+  private function parseScale(array $data) : int | NULL {
+    $scale = NULL;
+    if (count($data) == 7) {
+      $scale = round($data['SCALE'] / 1000, 1);
+      if ($scale < 0 && $scale > -2) {
+        $scale = 0;
+      }
+    }
+    return $scale;
   }
 
 }
