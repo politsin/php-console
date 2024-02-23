@@ -21,7 +21,9 @@ class ScaleCommand extends Command {
   // phpcs:disable
   private SerialDio $serial;
   private SymfonyStyle $io;
-  private string $port = '/dev/ttyUSB0';
+  private int $scale = 0;
+  private string $mixPort = '/dev/ttyUSB0';
+  private string $scalePort = '/dev/ttyUSB1';
   //phpcs:enable;
 
   /**
@@ -37,12 +39,17 @@ class ScaleCommand extends Command {
   protected function execute(InputInterface $input, OutputInterface $output) {
     $io = new SymfonyStyle($input, $output);
     $this->io = $io;
-    $this->usbList(TRUE);
+    $this->usbList();
+    if (0) {
+      $this->mixPort = "/dev/ttyUSB1";
+      $this->scalePort = "/dev/ttyUSB0";
+    }
     $pump = $this->initMixer();
     $scale = $this->initScale();
     usleep(100 * 1000);
+    $pump->send("M18\r\n");
     $this->readData($scale);
-    // $this->loop($scale);
+    $this->loop($scale, $pump);
     return 0;
   }
 
@@ -50,39 +57,54 @@ class ScaleCommand extends Command {
    * Loop.
    */
   private function initScale() : SerialDio {
-    $this->resetSerial('214b:7250');
-    return $this->initSerial('/dev/ttyUSB1');
+    $this->io->writeln("initScale: start " . $this->scalePort);
+    // $this->resetSerial('214b:7250');
+    return $this->initSerial($this->scalePort);
   }
 
   /**
    * Loop.
    */
   private function initMixer() : SerialDio {
-    $this->io->writeln("initMixer: start");
-    $this->resetSerial('1a86:7523');
-    $pump = $this->initSerial('/dev/ttyUSB0');
-    $init = '';
-    while ($init == "hello!!!") {
-      $pump->send("M118 hello!!!\r\n");
-      $this->io->writeln("initMixer: ping");
+    $this->io->writeln("initMixer: start " . $this->mixPort);
+    // $this->resetSerial('1a86:7523');
+    $pump = $this->initSerial($this->mixPort);
+    $state = '';
+    while ($state != "echo") {
+      $pump->send("M118 ECHO-INIT\r\n");
       foreach (explode("\n", $pump->read()) as $line) {
-        $data = trim($line);
-        $this->io->text($data);
+        $line = trim($line);
+        if (strpos($line, "ECHO-INIT") !== FALSE) {
+          $state = 'echo';
+        }
+        elseif ($line) {
+          $this->io->writeln($line);
+        }
       }
-      usleep(100 * 1000);
+      usleep(700 * 1000);
     }
-    $pump->send("G91");
+    $pump->send("G91\r\n");
+
+    $pump->send("G0 X-12000 F10000\r\n");
     return $pump;
   }
 
   /**
    * Loop.
    */
-  private function loop(SerialDio $serial, $delay_ms = 100) {
+  private function loop(SerialDio $scale, SerialDio $pump) {
+    $delay_ms = 1000;
     $this->io->writeln("Loop start");
     $ok = "";
     while ($ok != "ok") {
-      $data = $this->readData($serial);
+      $data = $this->readData($scale);
+      if ($this->scale < 30) {
+        $pump->send("G0 X-20 F5000\r\n");
+      }
+      else {
+        $this->io->writeln("DONE!");
+        $pump->send("M18\r\n");
+      }
       usleep($delay_ms * 1000);
     }
   }
@@ -121,6 +143,7 @@ class ScaleCommand extends Command {
       if ($scale < 0 && $scale > -2) {
         $scale = 0;
       }
+      $this->scale = $scale;
     }
     return $scale;
   }

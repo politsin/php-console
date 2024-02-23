@@ -16,6 +16,8 @@ trait UartTrait {
 
   /**
    * Serial init.
+   *
+   * Picocom /dev/ttyUSB1 -b 115200 -f h.
    */
   protected function initSerial(string $port) : SerialDio {
     $config = $this->getConfig();
@@ -24,8 +26,8 @@ trait UartTrait {
     $serial->open('r+b');
     $serial->setBlocking(0);
     $serial->setTimeout(0, 0);
-    $serial->send("hello\r\n");
     if (FALSE) {
+      $serial->send("hello\r\n");
     }
     return $serial;
   }
@@ -102,7 +104,7 @@ trait UartTrait {
     $config->setStopBits(StopBits::ONE);
     $config->setParity(Parity::NONE);
     $config->setFlowControl(FALSE);
-    $config->setCanonical(FALSE);
+    // $config->setCanonical(FALSE);
     return $config;
   }
 

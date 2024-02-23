@@ -2,11 +2,7 @@
 
 namespace App\Command;
 
-use Fawno\PhpSerial\Config\BaudRates;
-use Fawno\PhpSerial\Config\DataBits;
-use Fawno\PhpSerial\Config\Parity;
-use Fawno\PhpSerial\Config\StopBits;
-use Fawno\PhpSerial\SerialConfig;
+use App\Util\UartTrait;
 use Fawno\PhpSerial\SerialDio;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -15,30 +11,22 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
  * Marlin G-code Mixer.
- *
- * Find USB-tty (СH340 USB-Serial):
- * - `dmesg | grep tty`.
- * - `setserial -g /dev/ttyUSB[01]`
- * - `usbreset 1a86:7523`
- * - setserial -g /dev/ttyACM0
- * https://learn.sparkfun.com/tutorials/how-to-install-ch340-drivers/linux.
  */
 class MixerCommand extends Command {
+
+  use UartTrait;
 
   // phpcs:disable
   private SerialDio $serial;
   private SymfonyStyle $io;
-  private string $port = '/dev/ttyACM0';
-  // private string $port = '/dev/ttyACM0';
+  private string $mixPort = '/dev/ttyUSB0';
   // phpcs:enable
 
   /**
    * Config.
    */
   protected function configure() {
-    $this
-      ->setName('mixer')
-      ->setDescription('php with marlin, oue!!');
+    $this->setName('mixer')->setDescription('php with marlin, oue!!');
   }
 
   /**
@@ -51,19 +39,80 @@ class MixerCommand extends Command {
    */
   protected function execute(InputInterface $input, OutputInterface $output) {
     $io = new SymfonyStyle($input, $output);
-    // $io->section('Hello');
     $this->io = $io;
-    $this->runTty($io);
-
+    $map = [
+      // "X" => 45,
+      // "Y" => 55,
+      // "Z" => 70,
+      "E" => 40,
+    ];
+    $start = time();
+    $this->mix($map);
+    $this->io->writeln(time() - $start . "ms");
     return 0;
+  }
+
+  /**
+   * Mix!
+   */
+  private function mix(array $map) {
+    $pump = $this->initMixer();
+    $cmd = "G0 ";
+    foreach ($map as $key => $ml) {
+      $steps = $ml * 355;
+      $cmd .= "$key-$steps ";
+    }
+    $cmd .= "F10000\r\n";
+    $this->io->writeln($cmd);
+    $pump->send($cmd);
+    $pump->send("M18\r\n");
+    while (TRUE) {
+      foreach (explode("\n", $pump->read()) as $line) {
+        $line = trim($line);
+        if ($line == 'ok') {
+          break;
+        }
+        if ($line) {
+          dump($line);
+        }
+      }
+      usleep(300 * 1000);
+    }
+  }
+
+  /**
+   * Loop.
+   */
+  private function initMixer() : SerialDio {
+    $this->io->writeln("initMixer: start " . $this->mixPort);
+    $this->resetSerial('1a86:7523');
+    $pump = $this->initSerial($this->mixPort);
+    $state = '';
+    while ($state != "echo") {
+      $pump->send("M118 ECHO-INIT\r\n");
+      foreach (explode("\n", $pump->read()) as $line) {
+        $line = trim($line);
+        if (strpos($line, "ECHO-INIT") !== FALSE) {
+          $state = 'echo';
+        }
+        elseif ($line) {
+          $this->io->writeln($line);
+        }
+      }
+      usleep(700 * 1000);
+    }
+    $this->io->writeln("initMixer: done " . $this->mixPort);
+    $pump->send("G91\r\n");
+    // Cold extrudes are disabled (min temp 170C)
+    $pump->send("M302 S0\r\n");
+    return $pump;
   }
 
   /**
    * Command and wait ok.
    */
   protected function runTty($io) {
-    $this->resetSerial();
-    $this->initSerial();
+
     $commands = [
       "G91",
       "G4 P100",
@@ -73,7 +122,7 @@ class MixerCommand extends Command {
       "G4 S1",
       "G0 Z-37 F3000",
       "G4 S1",
-      "G0 E-40 F3000",
+      "G0 E-40 F300",
       "G4 S1",
     // "G0 X-350 Y-540 Z-370 E-200 F6000",
       "G4 S1",
@@ -108,55 +157,6 @@ class MixerCommand extends Command {
       }
     }
     usleep(100 * 1000);
-  }
-
-  /**
-   * Serial init.
-   */
-  protected function resetSerial() {
-    // GNSS: shell_exec('usbreset 1546:01a7').
-    shell_exec('usbreset 1a86:7523');
-  }
-
-  /**
-   * Serial init.
-   */
-  protected function initSerial() {
-    $config = $this->getConfig();
-    $serial = new SerialDio($this->port, $config);
-    $serial->open('r+b');
-    $serial->setBlocking(0);
-    $serial->setTimeout(0, 0);
-    $ok = "";
-    while ($ok != "ok") {
-      $serial->send("M118 hello\r\n");
-      usleep(100);
-      $responce = $serial->read();
-      foreach (explode("\n", $responce) as $line) {
-        $data = trim($line);
-        if ($data) {
-          $this->io->text($data);
-        }
-        if ($data == "ok") {
-          $ok = "ok";
-        }
-      }
-    }
-    $this->serial = $serial;
-  }
-
-  /**
-   * Get Config.
-   */
-  protected function getConfig() : SerialConfig {
-    $config = new SerialConfig();
-    $config->setBaudRate(BaudRates::B115200);
-    $config->setDataBits(DataBits::CS8);
-    $config->setStopBits(StopBits::ONE);
-    $config->setParity(Parity::NONE);
-    $config->setFlowControl(TRUE);
-    // $config->setCanonical(FALSE);
-    return $config;
   }
 
 }
