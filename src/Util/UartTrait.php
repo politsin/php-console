@@ -54,6 +54,18 @@ trait UartTrait {
           $data[$k][] = $line;
         }
       }
+      $prods = [];
+      foreach ($data as $key => $device) {
+        $skip = FALSE;
+        foreach ($device as $line) {
+          if (strpos($line, "Manufacturer=Linux")) {
+            $skip = TRUE;
+          }
+        }
+        if ($skip) {
+          unset($data[$key]);
+        }
+      }
       dump($data);
     }
     $map = [
@@ -62,6 +74,7 @@ trait UartTrait {
     ];
     dump($map);
     $usb = explode("\n", trim(shell_exec('/usr/bin/ls /dev/ttyUSB*')));
+    dump($usb);
     return $usb;
   }
 

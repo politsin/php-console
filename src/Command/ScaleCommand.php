@@ -22,6 +22,8 @@ class ScaleCommand extends Command {
   private SerialDio $serial;
   private SymfonyStyle $io;
   private string $port = '/dev/ttyUSB0';
+  //phpcs:enable;
+
   /**
    * Config.
    */
@@ -35,10 +37,12 @@ class ScaleCommand extends Command {
   protected function execute(InputInterface $input, OutputInterface $output) {
     $io = new SymfonyStyle($input, $output);
     $this->io = $io;
+    $this->usbList(TRUE);
+    $pump = $this->initMixer();
     $scale = $this->initScale();
     usleep(100 * 1000);
     $this->readData($scale);
-    $this->loop($scale);
+    // $this->loop($scale);
     return 0;
   }
 
@@ -48,6 +52,27 @@ class ScaleCommand extends Command {
   private function initScale() : SerialDio {
     $this->resetSerial('214b:7250');
     return $this->initSerial('/dev/ttyUSB1');
+  }
+
+  /**
+   * Loop.
+   */
+  private function initMixer() : SerialDio {
+    $this->io->writeln("initMixer: start");
+    $this->resetSerial('1a86:7523');
+    $pump = $this->initSerial('/dev/ttyUSB0');
+    $init = '';
+    while ($init == "hello!!!") {
+      $pump->send("M118 hello!!!\r\n");
+      $this->io->writeln("initMixer: ping");
+      foreach (explode("\n", $pump->read()) as $line) {
+        $data = trim($line);
+        $this->io->text($data);
+      }
+      usleep(100 * 1000);
+    }
+    $pump->send("G91");
+    return $pump;
   }
 
   /**
