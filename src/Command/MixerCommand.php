@@ -41,7 +41,8 @@ class MixerCommand extends Command {
     $io = new SymfonyStyle($input, $output);
     $this->io = $io;
     $map = [
-      "X" => 250,
+      // 40 секунт на 50г, //.
+      "X" => 50,
       // "Y" => 55,
       // "Z" => 150,
       // "E" => 40,
@@ -59,7 +60,7 @@ class MixerCommand extends Command {
     $pump = $this->initMixer();
     $cmd = "G0 ";
     foreach ($map as $key => $ml) {
-      $steps = $ml * 400;
+      $steps = $ml * 266;
       if ($key == "E" && $steps > 200) {
         $this->io->error("SET: E = 200 steps | $ml=$steps");
         $steps = 200;
@@ -88,7 +89,7 @@ class MixerCommand extends Command {
         }
       }
       if ($ok) {
-        break;
+        // break; //.
       }
       if (time() > $time + 3) {
         dump("done");
