@@ -41,10 +41,10 @@ class MixerCommand extends Command {
     $io = new SymfonyStyle($input, $output);
     $this->io = $io;
     $map = [
-      // "X" => 45,
+      "X" => 250,
       // "Y" => 55,
-      // "Z" => 70,
-      "E" => 40,
+      // "Z" => 150,
+      // "E" => 40,
     ];
     $start = time();
     $this->mix($map);
@@ -59,22 +59,40 @@ class MixerCommand extends Command {
     $pump = $this->initMixer();
     $cmd = "G0 ";
     foreach ($map as $key => $ml) {
-      $steps = $ml * 355;
+      $steps = $ml * 400;
+      if ($key == "E" && $steps > 200) {
+        $this->io->error("SET: E = 200 steps | $ml=$steps");
+        $steps = 200;
+      }
       $cmd .= "$key-$steps ";
     }
     $cmd .= "F10000\r\n";
     $this->io->writeln($cmd);
     $pump->send($cmd);
     $pump->send("M18\r\n");
+    $time = time();
+    $k = 0;
     while (TRUE) {
+      $ok = FALSE;
       foreach (explode("\n", $pump->read()) as $line) {
         $line = trim($line);
         if ($line == 'ok') {
+          $ok = TRUE;
+          dump("ok");
           break;
         }
         if ($line) {
-          dump($line);
+          $k++;
+          $time = time();
+          dump("$k | $line");
         }
+      }
+      if ($ok) {
+        break;
+      }
+      if (time() > $time + 3) {
+        dump("done");
+        break;
       }
       usleep(300 * 1000);
     }
@@ -104,7 +122,7 @@ class MixerCommand extends Command {
     $this->io->writeln("initMixer: done " . $this->mixPort);
     $pump->send("G91\r\n");
     // Cold extrudes are disabled (min temp 170C)
-    $pump->send("M302 S0\r\n");
+    $pump->send("M302 S0 P1\r\n");
     return $pump;
   }
 
@@ -122,7 +140,7 @@ class MixerCommand extends Command {
       "G4 S1",
       "G0 Z-37 F3000",
       "G4 S1",
-      "G0 E-40 F300",
+      "G0 E-200 F10000",
       "G4 S1",
     // "G0 X-350 Y-540 Z-370 E-200 F6000",
       "G4 S1",
