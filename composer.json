@@ -3,7 +3,6 @@
         "symfony/console": "^7",
         "symfony/process": "^7",
         "symfony/dotenv": "^7",
-        "fawno/modbus": "^0.2.1",
         "symfony/var-dumper": "^7",
         "symfony/yaml": "^7"
     },
