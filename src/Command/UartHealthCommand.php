@@ -17,8 +17,10 @@ class UartHealthCommand extends Command {
   use UartTrait;
   use ExecTrait;
 
+  // phpcs:disable
   private string $port = '/dev/ttyUSB0';
   private SymfonyStyle $io;
+  // phpcs:enable
 
   /**
    * Config.

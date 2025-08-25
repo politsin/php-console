@@ -15,14 +15,6 @@ trait UartTrait {
   protected function initSerial(string $port) {
     $config = $this->getConfig();
     $this->io->writeln("1 Serial: $port");
-    // $serial = new SerialDio($port, $config);
-    // $serial->open('r+b');
-    // $serial->setBlocking(0);
-    // $serial->setTimeout(0, 0);
-    // if (FALSE) {
-    //   $serial->send("hello\r\n");
-    // }
-    // return $serial;
   }
 
   /**

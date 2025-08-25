@@ -4,7 +4,6 @@ namespace App\Command;
 
 use App\Util\ExecTrait;
 use App\Util\UartTrait;
-use Fawno\PhpSerial\SerialDio;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -45,6 +44,10 @@ class ScaleCommand extends Command {
     }
     $pump = $this->initMixer();
     $scale = $this->initScale();
+    if (!$scale || !$pump) {
+      $this->io->error('Не удалось инициализировать устройства');
+      return Command::FAILURE;
+    }
     usleep(100 * 1000);
     $pump->send("M18\r\n");
     $this->readData($scale);
@@ -68,6 +71,9 @@ class ScaleCommand extends Command {
     $this->io->writeln("initMixer: start " . $this->mixPort);
     // $this->resetSerial('1a86:7523');
     $pump = $this->initSerial($this->mixPort);
+    if (!$pump) {
+      return NULL;
+    }
     $state = '';
     while ($state != "echo") {
       $pump->send("M118 ECHO-INIT\r\n");
@@ -95,17 +101,6 @@ class ScaleCommand extends Command {
     $delay_ms = 1000;
     $this->io->writeln("Loop start");
     $ok = "";
-    // while ($ok != "ok") {
-    //   $data = $this->readData($scale);
-    //   if ($this->scale < 30) {
-    //     $pump->send("G0 X-20 F5000\r\n");
-    //   }
-    //   else {
-    //     $this->io->writeln("DONE!");
-    //     $pump->send("M18\r\n");
-    //   }
-    //   usleep($delay_ms * 1000);
-    // }
   }
 
   /**
