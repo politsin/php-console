@@ -2,13 +2,6 @@
 
 namespace App\Util;
 
-use Fawno\PhpSerial\Config\BaudRates;
-use Fawno\PhpSerial\Config\DataBits;
-use Fawno\PhpSerial\Config\Parity;
-use Fawno\PhpSerial\Config\StopBits;
-use Fawno\PhpSerial\SerialConfig;
-use Fawno\PhpSerial\SerialDio;
-
 /**
  * Uart Trait.
  */
@@ -19,25 +12,25 @@ trait UartTrait {
    *
    * Picocom /dev/ttyUSB1 -b 115200 -f h.
    */
-  protected function initSerial(string $port) : SerialDio {
+  protected function initSerial(string $port) {
     $config = $this->getConfig();
     $this->io->writeln("1 Serial: $port");
-    $serial = new SerialDio($port, $config);
-    $serial->open('r+b');
-    $serial->setBlocking(0);
-    $serial->setTimeout(0, 0);
-    if (FALSE) {
-      $serial->send("hello\r\n");
-    }
-    return $serial;
+    // $serial = new SerialDio($port, $config);
+    // $serial->open('r+b');
+    // $serial->setBlocking(0);
+    // $serial->setTimeout(0, 0);
+    // if (FALSE) {
+    //   $serial->send("hello\r\n");
+    // }
+    // return $serial;
   }
 
   /**
    * Serial init.
    */
-  protected function resetSerial($id = '214b:7250') {
+  protected function resetSerial($id = '214b:7250') : string {
     // GNSS: shell_exec('usbreset 1546:01a7').
-    shell_exec("usbreset $id");
+    return shell_exec("usbreset $id");
   }
 
   /**
@@ -85,27 +78,38 @@ trait UartTrait {
    */
   private function driverTest() {
     $messg = trim(shell_exec('dmesg | grep ch34') ?? '');
+
     if (strpos($messg, 'ch34x')) {
       $this->io->writeln('<fg=green>OK</> - ch34x');
     }
     if (strpos($messg, 'ch341')) {
       dump($messg);
+
       $this->io->writeln('<fg=red>FAIL</>: ch341. Expect <fg=green>ch34x</>, install CH340  driver');
+      $install = <<<EOD
+      apt install linux-headers-$(uname -r)
+      git clone -b ubuntu https://github.com/juliagoda/CH341SER.git
+      cd CH341SER
+      make
+      kmodsign sha512 /var/lib/shim-signed/mok/MOK.priv /var/lib/shim-signed/mok/MOK.der ./ch34x.ko
+      make load
+      EOD;
+      $this->io->writeln($install);
     }
   }
 
   /**
    * Get Config.
    */
-  protected function getConfig() : SerialConfig {
-    $config = new SerialConfig();
-    $config->setBaudRate(BaudRates::B115200);
-    $config->setDataBits(DataBits::CS8);
-    $config->setStopBits(StopBits::ONE);
-    $config->setParity(Parity::NONE);
-    $config->setFlowControl(FALSE);
-    // $config->setCanonical(FALSE);
-    return $config;
+  protected function getConfig() {
+    // $config = new SerialConfig();
+    // $config->setBaudRate(BaudRates::B115200);
+    // $config->setDataBits(DataBits::CS8);
+    // $config->setStopBits(StopBits::ONE);
+    // $config->setParity(Parity::NONE);
+    // $config->setFlowControl(FALSE);
+    // // $config->setCanonical(FALSE);
+    return [];
   }
 
 }

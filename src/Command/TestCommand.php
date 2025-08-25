@@ -33,7 +33,7 @@ class TestCommand extends Command {
   /**
    * Exec.
    */
-  protected function execute(InputInterface $input, OutputInterface $output) {
+  protected function execute(InputInterface $input, OutputInterface $output): int {
     $number = 1;
     $io = new SymfonyStyle($input, $output);
     $io->section('Table');
@@ -124,6 +124,7 @@ class TestCommand extends Command {
       );
       $question->setErrorMessage('Color %s is invalid.');
     }
+    $io->info('done');
 
     return 0;
   }

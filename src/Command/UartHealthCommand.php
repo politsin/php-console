@@ -4,7 +4,6 @@ namespace App\Command;
 
 use App\Util\ExecTrait;
 use App\Util\UartTrait;
-use Fawno\PhpSerial\SerialDio;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -17,11 +16,9 @@ class UartHealthCommand extends Command {
 
   use UartTrait;
   use ExecTrait;
-  // phpcs:disable
-  private SerialDio $serial;
-  private SymfonyStyle $io;
+
   private string $port = '/dev/ttyUSB0';
-  // phpcs:enable
+  private SymfonyStyle $io;
 
   /**
    * Config.
@@ -33,7 +30,7 @@ class UartHealthCommand extends Command {
   /**
    * Exec.
    */
-  protected function execute(InputInterface $input, OutputInterface $output) {
+  protected function execute(InputInterface $input, OutputInterface $output): int {
     $io = new SymfonyStyle($input, $output);
     $this->io = $io;
     $usb = $this->usbList();

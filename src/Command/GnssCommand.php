@@ -2,12 +2,6 @@
 
 namespace App\Command;
 
-use Fawno\PhpSerial\Config\BaudRates;
-use Fawno\PhpSerial\Config\DataBits;
-use Fawno\PhpSerial\Config\Parity;
-use Fawno\PhpSerial\Config\StopBits;
-use Fawno\PhpSerial\SerialConfig;
-use Fawno\PhpSerial\SerialDio;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -19,7 +13,6 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class GnssCommand extends Command {
 
   // phpcs:disable
-  private SerialDio $serial;
   private SymfonyStyle $io;
   private string $port = '/dev/ttyACM0';
   private int $count = 0;
@@ -37,12 +30,12 @@ class GnssCommand extends Command {
   /**
    * Exec.
    */
-  protected function execute(InputInterface $input, OutputInterface $output) {
+  protected function execute(InputInterface $input, OutputInterface $output): int {
     $io = new SymfonyStyle($input, $output);
     $io->section('GNSS');
     $this->io = $io;
     $this->runTty($io);
-    return 0;
+    return Command::SUCCESS;
   }
 
   /**
@@ -232,7 +225,6 @@ class GnssCommand extends Command {
    * Serial init.
    */
   protected function runSerial() {
-    $serial = $this->serial;
     $ok = "";
     while ($ok != "ok") {
       usleep(100);
@@ -244,20 +236,6 @@ class GnssCommand extends Command {
         }
       }
     }
-  }
-
-  /**
-   * Get Config.
-   */
-  protected function getConfig() : SerialConfig {
-    $config = new SerialConfig();
-    $config->setBaudRate(BaudRates::B115200);
-    $config->setDataBits(DataBits::CS8);
-    $config->setStopBits(StopBits::ONE);
-    $config->setParity(Parity::NONE);
-    $config->setFlowControl(TRUE);
-    // $config->setCanonical(FALSE);
-    return $config;
   }
 
 }

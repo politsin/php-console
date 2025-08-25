@@ -19,7 +19,6 @@ class ScaleCommand extends Command {
   use UartTrait;
   use ExecTrait;
   // phpcs:disable
-  private SerialDio $serial;
   private SymfonyStyle $io;
   private int $scale = 0;
   private string $mixPort = '/dev/ttyUSB0';
@@ -36,7 +35,7 @@ class ScaleCommand extends Command {
   /**
    * Exec.
    */
-  protected function execute(InputInterface $input, OutputInterface $output) {
+  protected function execute(InputInterface $input, OutputInterface $output): int {
     $io = new SymfonyStyle($input, $output);
     $this->io = $io;
     $this->usbList();
@@ -50,13 +49,13 @@ class ScaleCommand extends Command {
     $pump->send("M18\r\n");
     $this->readData($scale);
     $this->loop($scale, $pump);
-    return 0;
+    return Command::SUCCESS;
   }
 
   /**
    * Loop.
    */
-  private function initScale() : SerialDio {
+  private function initScale() {
     $this->io->writeln("initScale: start " . $this->scalePort);
     // $this->resetSerial('214b:7250');
     return $this->initSerial($this->scalePort);
@@ -65,7 +64,7 @@ class ScaleCommand extends Command {
   /**
    * Loop.
    */
-  private function initMixer() : SerialDio {
+  private function initMixer() {
     $this->io->writeln("initMixer: start " . $this->mixPort);
     // $this->resetSerial('1a86:7523');
     $pump = $this->initSerial($this->mixPort);
@@ -92,27 +91,27 @@ class ScaleCommand extends Command {
   /**
    * Loop.
    */
-  private function loop(SerialDio $scale, SerialDio $pump) {
+  private function loop() {
     $delay_ms = 1000;
     $this->io->writeln("Loop start");
     $ok = "";
-    while ($ok != "ok") {
-      $data = $this->readData($scale);
-      if ($this->scale < 30) {
-        $pump->send("G0 X-20 F5000\r\n");
-      }
-      else {
-        $this->io->writeln("DONE!");
-        $pump->send("M18\r\n");
-      }
-      usleep($delay_ms * 1000);
-    }
+    // while ($ok != "ok") {
+    //   $data = $this->readData($scale);
+    //   if ($this->scale < 30) {
+    //     $pump->send("G0 X-20 F5000\r\n");
+    //   }
+    //   else {
+    //     $this->io->writeln("DONE!");
+    //     $pump->send("M18\r\n");
+    //   }
+    //   usleep($delay_ms * 1000);
+    // }
   }
 
   /**
    * Loop.
    */
-  private function readData(SerialDio $serial) : array {
+  private function readData($serial) : array {
     $result = [];
     foreach (explode("\n", $serial->read()) as $line) {
       $line = substr(trim($line), 3, -3);
