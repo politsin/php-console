@@ -44,4 +44,21 @@ php /opt/php-console/console.php gnss:listen --test-telegram
 ```
 - Influx health/запись — см. команды в README.md (корень).
 
+## 7) Конфигурация u-blox (максимальная)
+Включает расширенный набор сообщений и частоту 1 Гц.
+
+Запуск:
+```sh
+php /opt/php-console/console.php gnss:cfg-max --port=/dev/ttyACM0 --baud=9600
+```
+
+Что настраивается:
+- Частота навигации 1 Гц (UBX-CFG-RATE).
+- NMEA на UART1 и USB: GGA, GSA, GSV, RMC, GST, ZDA (UBX-CFG-MSG).
+- UBX на UART1 и USB: NAV-PVT, NAV-SAT, NAV-DOP (UBX-CFG-MSG).
+
+Примечания:
+- Созвездия (CFG-GNSS) и динамическая модель (NAV5) не меняются в этом пресете—зависят от модели.
+- Для применения некоторых настроек может потребоваться перезапуск питания.
+
 

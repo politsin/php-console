@@ -10,6 +10,7 @@ require __DIR__ . '/vendor/autoload.php';
 
 use App\Command\GnssCommand;
 use App\Command\GnssListenCommand;
+use App\Command\GnssCfgMaxCommand;
 use App\Command\MixerCommand;
 use App\Command\TestCommand;
 use App\Command\ScaleCommand;
@@ -29,6 +30,7 @@ $app->add(new MixerCommand());
 $app->add(new GnssCommand());
 $app->add(new GnssCommand());
 $app->add(new GnssListenCommand());
+$app->add(new GnssCfgMaxCommand());
 $app->add(new TestCommand());
 $app->add(new MarlinShRun());
 $app->add(new StartCommand());

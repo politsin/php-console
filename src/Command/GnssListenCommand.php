@@ -5,6 +5,7 @@ namespace App\Command;
 use App\Util\ExecTrait;
 use Predis\Client as PredisClient;
 use GuzzleHttp\Client as HttpClient;
+use GuzzleHttp\Exception\RequestException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -38,6 +39,8 @@ class GnssListenCommand extends Command {
   private array $alertTsByKey = [];
   private array $lastSatellites = [];
   private int $lastSvQuarterMinute = -1;
+  private array $lastGsa = [];
+  private array $lastGst = [];
   // phpcs:enable
 
   /**
@@ -165,6 +168,14 @@ class GnssListenCommand extends Command {
         $this->parseGsv($parts);
         break;
 
+      case 'GSA':
+        $this->parseGsa($parts);
+        break;
+
+      case 'GST':
+        $this->parseGst($parts);
+        break;
+
       default:
         // Skip other sentences for MVP.
         break;
@@ -238,6 +249,8 @@ class GnssListenCommand extends Command {
       'lon' => $fix > 0 ? $lon : NULL,
       'drift' => $drift,
       'snr' => $this->lastSnr,
+      'gsa' => $this->lastGsa,
+      'gst' => $this->lastGst,
     ]);
   }
 
@@ -286,6 +299,8 @@ class GnssListenCommand extends Command {
       'lon' => $status === 'A' ? $lon : NULL,
       'drift' => $drift,
       'snr' => $this->lastSnr,
+      'gsa' => $this->lastGsa,
+      'gst' => $this->lastGst,
     ]);
   }
 
@@ -349,6 +364,70 @@ class GnssListenCommand extends Command {
         $this->io->warning('GSV data size mismatch.');
       }
     }
+  }
+
+  /**
+   * Parse GSA | GNSS DOP and Active Satellites.
+   */
+  private function parseGsa(array $d): void {
+    // NMEA GSA fields:
+    // 0: Mode (M/A), 1: Fix type (1/2/3), 2..13: up to 12 PRN used,
+    // 14: PDOP, 15: HDOP, 16: VDOP, [17: System ID - optional].
+    $mode = trim($d[0] ?? '');
+    $fixType = (int) ($d[1] ?? 0);
+    $used = [];
+    for ($i = 2; $i <= 13; $i++) {
+      $prn = trim($d[$i] ?? '');
+      if ($prn !== '') {
+        $used[] = (int) $prn;
+      }
+    }
+    $pdop = (float) ($d[14] ?? 0);
+    $hdop = (float) ($d[15] ?? 0);
+    $vdop = (float) ($d[16] ?? 0);
+    $this->lastGsa = [
+      'mode' => $mode,
+      'fixType' => $fixType,
+      'used' => $used,
+      'pdop' => $pdop,
+      'hdop' => $hdop,
+      'vdop' => $vdop,
+    ];
+    $this->io->text(sprintf(
+      'GSA used=%d PDOP=%.1f HDOP=%.1f VDOP=%.1f',
+      count($used),
+      $pdop,
+      $hdop,
+      $vdop,
+    ));
+  }
+
+  /**
+   * Parse GST | GNSS Pseudorange Error Statistics.
+   */
+  private function parseGst(array $d): void {
+    // NMEA GST fields:
+    // 0: UTC time, 1: RMS, 2: sigma_major, 3: sigma_minor, 4: orientation,
+    // 5: sigma_lat, 6: sigma_lon, 7: sigma_alt.
+    $time = trim($d[0] ?? '');
+    $rms = (float) ($d[1] ?? 0);
+    $sigmaLat = (float) ($d[5] ?? 0);
+    $sigmaLon = (float) ($d[6] ?? 0);
+    $sigmaAlt = (float) ($d[7] ?? 0);
+    $this->lastGst = [
+      'time' => $time,
+      'rms' => $rms,
+      'sigma_lat' => $sigmaLat,
+      'sigma_lon' => $sigmaLon,
+      'sigma_alt' => $sigmaAlt,
+    ];
+    $this->io->text(sprintf(
+      'GST RMS=%.2f σlat=%.2f σlon=%.2f σalt=%.2f',
+      $rms,
+      $sigmaLat,
+      $sigmaLon,
+      $sigmaAlt,
+    ));
   }
 
   /**
@@ -490,19 +569,24 @@ class GnssListenCommand extends Command {
       $hasFix = ($state['status'] === 'A');
     }
     if (!$hasFix) {
-      // Skip publishing coordinates/history when there is no valid fix.
+      // No valid fix: always notify via webhook, skip Redis/Influx/history.
+      $this->sendWebhook($state);
       return;
     }
     // Ensure event timestamp embedded into state.
     $eventTs = time();
     $state['event_ts'] = $state['event_ts'] ?? $eventTs;
     $state['event_iso'] = $state['event_iso'] ?? gmdate('c', (int) $state['event_ts']);
+    // Attach diagnostic hints.
+    $state['diag'] = $this->buildDiag($state);
     $payload = json_encode([
       'ts' => $eventTs,
       'port' => $this->port,
       'baud' => $this->baud,
       'state' => $state,
       'satellites' => $this->lastSatellites,
+      'gsa' => $this->lastGsa,
+      'gst' => $this->lastGst,
     ]);
     try {
       $this->redis->setex('gnss:state:latest', $this->redisTtl, $payload);
@@ -582,6 +666,9 @@ class GnssListenCommand extends Command {
       'drift_r' => (float) ($state['drift']['radius'] ?? 0.0),
       'drift_avg' => (float) ($state['drift']['avg'] ?? 0.0),
       'drift_max' => (float) ($state['drift']['max'] ?? 0.0),
+      'pdop' => (float) ($state['gsa']['pdop'] ?? 0.0),
+      'vdop' => (float) ($state['gsa']['vdop'] ?? 0.0),
+      'gst_rms' => (float) ($state['gst']['rms'] ?? 0.0),
     ];
     // Optionally emit per-satellite SNR as fields (id-indexed) once per quarter minute.
     $quarter = (int) floor(time() / 900);
@@ -635,6 +722,39 @@ class GnssListenCommand extends Command {
   }
 
   /**
+   * Build diagnostic hints.
+   */
+  private function buildDiag(array $state): array {
+    $diag = [];
+    $svInView = (int) ($this->lastSnr['sv'] ?? 0);
+    $used = isset($this->lastGsa['used']) ? (int) count($this->lastGsa['used']) : 0;
+    $pdop = (float) ($this->lastGsa['pdop'] ?? 0.0);
+    $snrAvg = (float) ($this->lastSnr['avg'] ?? 0.0);
+    $rms = (float) ($this->lastGst['rms'] ?? 0.0);
+    // Heuristic: many visible, few used, decent SNR -> geometry/filters issue.
+    if ($svInView >= 8 && $used <= 3 && $snrAvg >= 20.0) {
+      $diag[] = 'vis_but_not_used';
+    }
+    if ($pdop >= 4.0) {
+      $diag[] = 'pdop_high';
+    }
+    if ($rms >= 10.0) {
+      $diag[] = 'gst_rms_high';
+    }
+    if (empty($diag)) {
+      $diag[] = 'ok';
+    }
+    return [
+      'tags' => $diag,
+      'sv_in_view' => $svInView,
+      'sv_used' => $used,
+      'pdop' => $pdop,
+      'snr_avg' => $snrAvg,
+      'gst_rms' => $rms,
+    ];
+  }
+
+  /**
    * Init webhook HTTP client.
    */
   private function initWebhook(): void {
@@ -668,6 +788,8 @@ class GnssListenCommand extends Command {
     // Ensure event timestamp embedded into state for webhook too.
     $state['event_ts'] = $state['event_ts'] ?? $eventTs;
     $state['event_iso'] = $state['event_iso'] ?? gmdate('c', (int) $state['event_ts']);
+    // Attach diagnostic hints for webhook.
+    $state['diag'] = $state['diag'] ?? $this->buildDiag($state);
     $payload = [
       'ts' => $eventTs,
       'host' => gethostname() ?: 'unknown',
@@ -684,7 +806,38 @@ class GnssListenCommand extends Command {
       ]);
     }
     catch (\Throwable $e) {
-      $this->io->warning('Webhook send failed: ' . $e->getMessage());
+      $status = NULL;
+      $respBody = NULL;
+      if ($e instanceof RequestException && $e->hasResponse()) {
+        try {
+          $status = $e->getResponse()->getStatusCode();
+          $respBody = (string) $e->getResponse()->getBody();
+        }
+        catch (\Throwable $ignored) {
+        }
+      }
+      $err = [
+        'ts' => time(),
+        'url' => $base,
+        'status' => $status,
+        'message' => $e->getMessage(),
+      ];
+      if ($respBody !== NULL) {
+        $err['body'] = mb_substr($respBody, 0, 500);
+      }
+      $msg = 'Webhook send failed: ' . json_encode($err);
+      $this->io->error($msg);
+      @error_log('[gnss] ' . $msg);
+      if ($this->redis !== NULL) {
+        try {
+          $this->redis->setex('gnss:webhook:last_error', 300, json_encode($err));
+          $this->redis->incr('gnss:webhook:error_count');
+        }
+        catch (\Throwable $ignored) {
+        }
+      }
+      // By default fail fast if webhook did not succeed.
+      throw new \RuntimeException($msg);
     }
   }
 
