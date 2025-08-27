@@ -3,11 +3,13 @@
 
 /**
  * @file
+ * Точка входа для Symfony Console приложения.
  */
 
 require __DIR__ . '/vendor/autoload.php';
 
 use App\Command\GnssCommand;
+use App\Command\GnssListenCommand;
 use App\Command\MixerCommand;
 use App\Command\TestCommand;
 use App\Command\ScaleCommand;
@@ -26,6 +28,7 @@ $app = new Application('Console App', 'v0.1.0');
 $app->add(new MixerCommand());
 $app->add(new GnssCommand());
 $app->add(new GnssCommand());
+$app->add(new GnssListenCommand());
 $app->add(new TestCommand());
 $app->add(new MarlinShRun());
 $app->add(new StartCommand());

@@ -4,7 +4,9 @@
         "symfony/process": "^7",
         "symfony/dotenv": "^7",
         "symfony/var-dumper": "^7",
-        "symfony/yaml": "^7"
+        "symfony/yaml": "^7",
+        "predis/predis": "^2",
+        "guzzlehttp/guzzle": "^7"
     },
     "autoload": {
         "psr-4": {
