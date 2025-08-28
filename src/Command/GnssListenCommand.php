@@ -616,6 +616,10 @@ class GnssListenCommand extends Command {
    * Init Influx HTTP client.
    */
   private function initInflux(): void {
+    if (empty($_ENV['GNSS_INFLUX_ENABLE'])) {
+      $this->http = NULL;
+      return;
+    }
     $url = trim((string) ($_ENV['INFLUX_URL'] ?? ''));
     $host = trim((string) ($_ENV['INFLUX_HOST'] ?? ''));
     $port = trim((string) ($_ENV['INFLUX_PORT'] ?? ''));
@@ -934,6 +938,9 @@ class GnssListenCommand extends Command {
    * Telegram notify with simple rate limiting.
    */
   private function notifyTelegram(string $text, string $key, int $minInterval): void {
+    if (empty($_ENV['GNSS_TELEGRAM_ENABLE'])) {
+      return;
+    }
     $token = (string) (
       $_ENV['TELEGRAM_BOT_TOKEN']
       ?? $_ENV['TELEGRAM_TOKEN']
