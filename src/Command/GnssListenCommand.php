@@ -41,6 +41,9 @@ class GnssListenCommand extends Command {
   private int $lastSvQuarterMinute = -1;
   private array $lastGsa = [];
   private array $lastGst = [];
+  private int $memBaseBytes = 0;
+  private float $memStepFactor = 1.2;
+  private int $memNextBytes = 0;
   // phpcs:enable
 
   /**
@@ -96,6 +99,7 @@ class GnssListenCommand extends Command {
           }
         }
       }
+      $this->checkMemoryAndAlert();
       usleep(50 * 1000);
     }
   }
@@ -528,6 +532,10 @@ class GnssListenCommand extends Command {
    * Init Redis client from env.
    */
   private function initRedis(): void {
+    if (empty($_ENV['GNSS_REDIS_ENABLE'])) {
+      $this->redis = NULL;
+      return;
+    }
     $dsn = (string) ($_ENV['REDIS_DSN'] ?? '');
     $ttl = (int) ($_ENV['GNSS_REDIS_TTL'] ?? 15);
     if ($dsn === '') {
@@ -558,9 +566,6 @@ class GnssListenCommand extends Command {
    * Publish latest GNSS state to Redis with TTL.
    */
   private function publishState(array $state): void {
-    if ($this->redis === NULL) {
-      return;
-    }
     $hasFix = FALSE;
     if (isset($state['fix'])) {
       $hasFix = ((int) $state['fix']) > 0;
@@ -588,16 +593,18 @@ class GnssListenCommand extends Command {
       'gsa' => $this->lastGsa,
       'gst' => $this->lastGst,
     ]);
-    try {
-      $this->redis->setex('gnss:state:latest', $this->redisTtl, $payload);
-      // Minute-level history key, e.g. gnss:state:2025:08:27:12:34.
-      $ts = (int) time();
-      $minuteKey = 'gnss:state:' . date('Y:m:d:H:i', $ts);
-      $historyTtl = (int) ($_ENV['GNSS_REDIS_HISTORY_TTL'] ?? 86400);
-      $this->redis->setex($minuteKey, max($historyTtl, $this->redisTtl), $payload);
-    }
-    catch (\Throwable $e) {
-      $this->io->warning('Redis publish failed: ' . $e->getMessage());
+    if ($this->redis !== NULL) {
+      try {
+        $this->redis->setex('gnss:state:latest', $this->redisTtl, $payload);
+        // Minute-level history key, e.g. gnss:state:YYYY:MM:DD:HH:MM.
+        $ts = (int) time();
+        $minuteKey = 'gnss:state:' . date('Y:m:d:H:i', $ts);
+        $historyTtl = (int) ($_ENV['GNSS_REDIS_HISTORY_TTL'] ?? 86400);
+        $this->redis->setex($minuteKey, max($historyTtl, $this->redisTtl), $payload);
+      }
+      catch (\Throwable $e) {
+        $this->io->warning('Redis publish failed: ' . $e->getMessage());
+      }
     }
 
     $this->influxWrite($state);
@@ -670,7 +677,8 @@ class GnssListenCommand extends Command {
       'vdop' => (float) ($state['gsa']['vdop'] ?? 0.0),
       'gst_rms' => (float) ($state['gst']['rms'] ?? 0.0),
     ];
-    // Optionally emit per-satellite SNR as fields (id-indexed) once per quarter minute.
+    // Optionally emit per-satellite SNR as fields (id-indexed)
+    // once per quarter minute.
     $quarter = (int) floor(time() / 900);
     if ($this->lastSvQuarterMinute !== $quarter && !empty($this->lastSatellites)) {
       $this->lastSvQuarterMinute = $quarter;
@@ -755,6 +763,37 @@ class GnssListenCommand extends Command {
   }
 
   /**
+   * Check memory and notify on growth steps.
+   */
+  private function checkMemoryAndAlert(): void {
+    if (empty($_ENV['GNSS_MEM_ALERT'])) {
+      return;
+    }
+    if ($this->memBaseBytes === 0) {
+      $this->memBaseBytes = (int) memory_get_usage(TRUE);
+      $stepPct = (float) ($_ENV['GNSS_MEM_STEP_PCT'] ?? 20);
+      $this->memStepFactor = max(1.0 + ($stepPct / 100.0), 1.05);
+      $this->memNextBytes = (int) ceil($this->memBaseBytes * $this->memStepFactor);
+      return;
+    }
+    $current = (int) memory_get_usage(TRUE);
+    if ($current >= $this->memNextBytes) {
+      $toMb = function (int $b) {
+        return (int) round($b / (1024 * 1024));
+      };
+      $text = sprintf(
+        'GNSS memory grew: %d -> %d MB (+%d%%)',
+        $toMb($this->memBaseBytes),
+        $toMb($current),
+        (int) round(($current / max($this->memBaseBytes, 1) - 1.0) * 100)
+      );
+      $this->notifyTelegram($text, 'mem_grow', 0);
+      $this->memBaseBytes = $current;
+      $this->memNextBytes = (int) ceil($this->memBaseBytes * $this->memStepFactor);
+    }
+  }
+
+  /**
    * Init webhook HTTP client.
    */
   private function initWebhook(): void {
@@ -836,8 +875,10 @@ class GnssListenCommand extends Command {
         catch (\Throwable $ignored) {
         }
       }
-      // By default fail fast if webhook did not succeed.
-      throw new \RuntimeException($msg);
+      // Fail-fast only when explicitly enabled.
+      if (!empty($_ENV['GNSS_WEBHOOK_STRICT'])) {
+        throw new \RuntimeException($msg);
+      }
     }
   }
 
